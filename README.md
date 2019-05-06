@@ -2,7 +2,7 @@
 
 This is a tensorflow implementation of [Stochastic Video Generation with a Learned Prior](https://sites.google.com/view/svglp/)
 
-##Dependencies
+## Dependencies
 1. Tensorflow
 2. Tensor2tensor
 
