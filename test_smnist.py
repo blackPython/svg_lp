@@ -41,8 +41,8 @@ for prediction in estimator.predict(input_fn= lambda: sminst_input_func(hparams,
     input_list.append((prediction['inputs']*255).astype(np.uint8))
 
 for i,(predictions,inputs) in enumerate(zip(prediction_list,input_list)):
-    predictions = map(lambda x: np.squeeze(x),np.split(predictions, hparams.num_target_frames))
-    inputs = map(lambda x: np.squeeze(x), np.split(inputs, hparams.num_input_frames))
+    predictions = map(lambda x: np.stack([np.squeeze(x)]*3, axis = 2),np.split(predictions, hparams.num_target_frames))
+    inputs = map(lambda x: np.stack([np.squeeze(x)]*3, axis =2), np.split(inputs, hparams.num_input_frames))
     out_file = os.path.join(args.out_dir, args.prediction_prefix)+ str(i+1) + ".gif"
     in_file = os.path.join(args.out_dir, args.input_prefix) + str(i+1) + ".gif"
     utils.save_gif(out_file, predictions, args.fps)
