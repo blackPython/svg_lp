@@ -287,7 +287,7 @@ class NextFrameSmnist(object):
         kl_loss = 0
 
         #recon loss
-        recon_loss = l2_loss(tf.stack(predicted_frames), tf.stack(all_frames[1:]))*num_all_frames
+        recon_loss = l2_loss(tf.stack(predicted_frames), tf.stack(all_frames[1:]))*(num_all_frames-1)
 
         if self.is_training:
             #kl loss
