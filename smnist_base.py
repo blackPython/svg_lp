@@ -6,6 +6,7 @@ import utils
 import numpy as np
 from functools import partial
 import os
+import cv2
 
 def l2_loss(val1,val2):
     return tf.reduce_mean(tf.square(val1-val2))
@@ -48,7 +49,7 @@ class NextFrameSmnist(object):
             hidden - The output tensor which is of half height and width
         """
         hidden = tf.layers.conv2d( x, nout, 4, strides = 2, padding = "same")
-        hidden = tf.contrib.layers.batch_norm(hidden)
+        hidden = tf.layers.batch_normalization(hidden, momentum = 0.9, training = self.is_training)
         hidden = tf.nn.leaky_relu(hidden, alpha = 0.2)
         return hidden
 
@@ -62,7 +63,7 @@ class NextFrameSmnist(object):
             hidden - The output tensor which is of half height and width
         """
         hidden = tf.layers.conv2d_transpose( x, nout, 4, strides = 2, padding = "same")
-        hidden = tf.contrib.layers.batch_norm(hidden)
+        hidden = tf.layers.batch_normalization(hidden, momentum = 0.9, training = self.is_training)
         hidden = tf.nn.leaky_relu(hidden, alpha = 0.2)
         return hidden
 
@@ -92,7 +93,7 @@ class NextFrameSmnist(object):
         
         #4 x 4 x (nf*8)
         h5 = tf.layers.conv2d(h4, dim, 4)
-        h5 = tf.contrib.layers.batch_norm(h5)
+        h5 = tf.layers.batch_normalization(h5, momentum = 0.9, training = self.is_training)
         h5 = tf.nn.tanh(h5)
 
         return tf.reshape(h5, [-1, dim]), [h1, h2, h3, h4]
@@ -112,7 +113,7 @@ class NextFrameSmnist(object):
         nf = 64
 
         h1 = tf.layers.conv2d_transpose(x, nf * 8, 4)
-        h1 = tf.contrib.layers.batch_norm(h1)
+        h1 = tf.layers.batch_normalization(h1, momentum = 0.9, training = self.is_training)
         h1 = tf.nn.leaky_relu(h1, alpha = 0.2)
 
         #4 x 4x nf*8
@@ -157,11 +158,9 @@ class NextFrameSmnist(object):
         states: updated RNN states
         """
         with tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
-            embedded = tfl.dense(
-                inputs, cell.output_size, activation=tf.nn.relu, name="embed")
+            embedded = tfl.dense(inputs, cell.output_size, name="embed")
             hidden, states = cell(embedded, states)
-            outputs = tfl.dense(
-            hidden, output_size, activation=tf.nn.relu, name="output")
+            outputs = tfl.dense(hidden, output_size, activation=tf.nn.tanh, name="output")
 
         return outputs, states
 
@@ -180,13 +179,10 @@ class NextFrameSmnist(object):
         states: updated RNN states
         """
         with tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
-            embedded = tfl.dense(
-                inputs, cell.output_size, activation=tf.nn.relu, name="embed")
+            embedded = tfl.dense( inputs, cell.output_size, name="embed")
             hidden, states = cell(embedded, states)
-            mu = tfl.dense(
-                hidden, output_size, activation=None, name="mu")
-            logvar = tfl.dense(
-                hidden, output_size, activation=None, name="logvar")
+            mu = tfl.dense(hidden, output_size, activation=None, name="mu")
+            logvar = tfl.dense(hidden, output_size, activation=None, name="logvar")
 
         return mu, logvar, states
 
@@ -351,11 +347,11 @@ def smnist_model_fn(features, labels, mode, params):
 def generate_smnist_sequence(seq_len, mnist_images, frame_size, num_digits):
     digit_indices = np.random.randint(0,mnist_images.shape[0], size = num_digits)
     digits = [mnist_images[digit_index] for digit_index in digit_indices]
-    digit_size = digits[0].shape[0]
+    digit_size = 32
     image_size = frame_size[0]
     x = np.zeros((seq_len, image_size, image_size, 1), dtype = np.float32)
     for n in range(len(digits)):
-        digit = digits[n].astype(np.float32).reshape([digit_size, digit_size,1]) / 255.0
+        digit = np.expand_dims(cv2.resize(digits[n].astype(np.float32)/255.0, dsize = (digit_size,digit_size), interpolation = cv2.INTER_CUBIC),2)
         sx = np.random.randint(image_size - digit_size)
         sy = np.random.randint(image_size - digit_size)
         dx = np.random.randint(-4, 5)
@@ -387,9 +383,9 @@ def generate_smnist_sequence(seq_len, mnist_images, frame_size, num_digits):
     x[x>1] = 1
     return x
 
-def dataset_generator_func(hparams):
+def dataset_generator_func(hparams,mode):
     temp = tf.keras.datasets.mnist.load_data()
-    smnist_images = np.concatenate([temp[0][0],temp[1][0]], axis = 0)
+    smnist_images = temp[mode == tf.estimator.ModeKeys.EVAL][0]
     num_input_frames = hparams.num_input_frames
     num_target_frames = hparams.num_target_frames
     frame_size = hparams.frame_size
@@ -403,14 +399,14 @@ def dataset_generator_func(hparams):
         yield features
 
 #The same thing is used for all
-def sminst_input_func(hparams, num_samples = -1):
+def sminst_input_func(hparams, mode,num_samples = -1):
     num_input_frames = hparams.num_input_frames
     num_target_frames = hparams.num_target_frames
     frame_size = hparams.frame_size
     output_type = {"inputs":tf.float32, "targets":tf.float32}
     output_shape = {"inputs" : tf.TensorShape([num_input_frames] + list(frame_size)),\
         "targets" : tf.TensorShape([num_target_frames] + list(frame_size))}
-    generator_func = partial(dataset_generator_func, hparams)
+    generator_func = partial(dataset_generator_func, hparams, mode)
     dataset = tf.data.Dataset.from_generator(generator_func, output_type, output_shape)
     dataset = dataset.take(num_samples)
     dataset = dataset.batch(hparams.batch_size)

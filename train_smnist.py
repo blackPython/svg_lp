@@ -29,7 +29,7 @@ run_config = tf.estimator.RunConfig(model_dir = model_dir, train_distribute = st
 estimator = tf.estimator.Estimator(smnist_model_fn, model_dir=model_dir,\
     config = run_config, params = {"hparams" : hparams})
 
-train_spec = tf.estimator.TrainSpec(input_fn = lambda : sminst_input_func(hparams), max_steps = num_iterations)
-eval_spec  = tf.estimator.EvalSpec(input_fn = lambda : sminst_input_func(hparams))
+train_spec = tf.estimator.TrainSpec(input_fn = lambda : sminst_input_func(hparams, tf.estimator.ModeKeys.TRAIN), max_steps = num_iterations)
+eval_spec  = tf.estimator.EvalSpec(input_fn = lambda : sminst_input_func(hparams, tf.estimator.ModeKeys.TRAIN))
 
 tf.estimator.train_and_evaluate(estimator, train_spec, eval_spec)
