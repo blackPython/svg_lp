@@ -215,8 +215,8 @@ class NextFrameSmnist(object):
 
         #Encoding
         enc_frames, enc_skips = [], []
-        with tf.variable_scope("encoder", reuse = tf.AUTO_REUSE):
-            for frame in all_frames if self.is_training else all_frames[:num_input_frames]:
+        for frame in all_frames if self.is_training else all_frames[:num_input_frames]:
+            with tf.variable_scope("encoder", reuse = tf.AUTO_REUSE):
                 enc, skip = self.encoder(frame)
                 enc_frames.append(enc)
                 enc_skips.append(skip)
